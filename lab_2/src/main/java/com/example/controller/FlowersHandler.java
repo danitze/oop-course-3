@@ -5,11 +5,12 @@ import com.example.entity.*;
 import org.xml.sax.Attributes;
 import org.xml.sax.helpers.DefaultHandler;
 
+import java.util.Map;
 import java.util.Objects;
 
 public class FlowersHandler extends DefaultHandler {
 
-    private Flowers flowers;
+    private final Flowers flowers;
 
     private FlowerBuilder flowerBuilder;
     private StringBuilder tagTextBuilder;
@@ -22,10 +23,19 @@ public class FlowersHandler extends DefaultHandler {
     private Lighting lighting;
     private Watering watering;
 
-    @Override
-    public void startDocument() {
+    // For setField method
+    private Flower flower;
+
+    public FlowersHandler() {
         flowers = new Flowers();
     }
+
+    public String getName() {
+        return Tags.FLOWER;
+    }
+
+    @Override
+    public void startDocument() {}
 
     @Override
     public void startElement(String uri, String localName, String qName, Attributes attributes) {
@@ -120,6 +130,70 @@ public class FlowersHandler extends DefaultHandler {
                 break;
             case Tags.MULTIPLYING:
                 flowerBuilder.multiplying(Multiplying.getElByValue(tagTextBuilder.toString()));
+                break;
+            default:
+                break;
+        }
+    }
+
+    public void setField(String qName, String content, Map<String, String> attributes) {
+        switch (qName) {
+            case Tags.FLOWER:
+                flower = new Flower();
+                flowers.add(flower);
+                break;
+            case Tags.NAME:
+                flower.setName(content);
+                break;
+            case Tags.SOIL:
+                flower.setSoil(Soil.getElByValue(content));
+                break;
+            case Tags.ORIGIN:
+                flower.setOrigin(content);
+                break;
+            case Tags.VISUAL_PARAMETERS:
+                flower.setVisualParameters(new VisualParameters());
+                break;
+            case Tags.STEM_COLOR:
+                flower.getVisualParameters().setStemColor(content);
+                break;
+            case Tags.LEAF_COLOR:
+                flower.getVisualParameters().setLeafColor(content);
+                break;
+            case Tags.AVE_LEN_FLOWER:
+                aveLenFlower = new AveLenFlower();
+                aveLenFlower.setMeasure(
+                        AveLenFlower.Measure.getElByValue(attributes.get(com.example.constants.Attributes.MEASURE))
+                );
+                aveLenFlower.setValue(Integer.parseInt(content));
+                flower.getVisualParameters().setAveLenFlower(aveLenFlower);
+                break;
+            case Tags.GROWING_TIPS:
+                flower.setGrowingTips(new GrowingTips());
+                break;
+            case Tags.TEMPERATURE:
+                temperature = new Temperature();
+                temperature.setMeasure(
+                        Temperature.Measure.getElByValue(attributes.get(com.example.constants.Attributes.MEASURE))
+                );
+                temperature.setValue(Integer.parseInt(content));
+                flower.getGrowingTips().setTemperature(temperature);
+                break;
+            case Tags.LIGHTING:
+                flower.getGrowingTips().setLightRequiring(
+                        Lighting.getElByValue(attributes.get(com.example.constants.Attributes.LIGHT_REQUIRING))
+                );
+                break;
+            case Tags.WATERING:
+                watering = new Watering();
+                watering.setMeasure(
+                        Watering.Measure.getElByValue(attributes.get(com.example.constants.Attributes.MEASURE))
+                );
+                watering.setValue(Integer.parseInt(content));
+                flower.getGrowingTips().setWatering(watering);
+                break;
+            case Tags.MULTIPLYING:
+                flower.setMultiplying(Multiplying.getElByValue(content));
                 break;
             default:
                 break;

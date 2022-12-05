@@ -18,13 +18,14 @@ public class CustomPhaser {
 
     public synchronized void arriveAndAwaitAdvance() {
         --partiesAwait;
-        if (partiesAwait > 0) {
+        while (partiesAwait > 0) {
             try {
                 wait();
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
-        } else {
+        }
+        if(partiesAwait == 0) {
             reset();
         }
     }

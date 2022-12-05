@@ -3,12 +3,12 @@ package com.example.entity;
 import java.util.Objects;
 
 public class Flower {
-    private final String name;
-    private final Soil soil;
-    private final String origin;
-    private final VisualParameters visualParameters;
-    private final GrowingTips growingTips;
-    private final Multiplying multiplying;
+    private String name;
+    private Soil soil;
+    private String origin;
+    private VisualParameters visualParameters;
+    private GrowingTips growingTips;
+    private Multiplying multiplying;
 
     public String getName() {
         return name;
@@ -61,6 +61,9 @@ public class Flower {
         return result;
     }
 
+    public Flower() {
+    }
+
     public Flower(String name, Soil soil, String origin, VisualParameters visualParameters,
                   GrowingTips growingTips, Multiplying multiplying) {
         this.name = name;
@@ -68,6 +71,30 @@ public class Flower {
         this.origin = origin;
         this.visualParameters = visualParameters;
         this.growingTips = growingTips;
+        this.multiplying = multiplying;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public void setSoil(Soil soil) {
+        this.soil = soil;
+    }
+
+    public void setOrigin(String origin) {
+        this.origin = origin;
+    }
+
+    public void setVisualParameters(VisualParameters visualParameters) {
+        this.visualParameters = visualParameters;
+    }
+
+    public void setGrowingTips(GrowingTips growingTips) {
+        this.growingTips = growingTips;
+    }
+
+    public void setMultiplying(Multiplying multiplying) {
         this.multiplying = multiplying;
     }
 

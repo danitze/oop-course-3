@@ -9,7 +9,7 @@ public class Barrier {
 
     public synchronized void await() throws InterruptedException {
         partiesAwait--;
-        if(partiesAwait > 0) this.wait();
+        while (partiesAwait > 0) this.wait();
         partiesAwait = partiesAtStart;
         notifyAll();
     }

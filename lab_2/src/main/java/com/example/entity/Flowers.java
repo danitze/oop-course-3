@@ -24,6 +24,13 @@ public class Flowers {
     }
 
     @Override
+    public String toString() {
+        return "Flowers{" +
+                "flowerList=" + flowerList +
+                '}';
+    }
+
+    @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;

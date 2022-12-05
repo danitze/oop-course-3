@@ -5,11 +5,11 @@ public class CustomReentrantLock {
     private static boolean isLocked = false;
 
     public synchronized void lock() {
-        if (isLocked) {
+        while (isLocked) {
             try {
                 wait();
             } catch (InterruptedException e) {
-                throw new RuntimeException(e);
+                Thread.currentThread().interrupt();
             }
         }
         isLocked = true;
@@ -24,7 +24,7 @@ public class CustomReentrantLock {
     }
 
     public synchronized void unlock() {
-        notifyAll();
+        notify();
         isLocked = false;
     }
 }
