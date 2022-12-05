@@ -7,9 +7,11 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.Bundle
+import android.util.Log
 import android.view.MotionEvent
 import android.view.View
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
@@ -25,61 +27,6 @@ import java.util.Arrays
 
 class MainActivity : AppCompatActivity(), SensorEventListener {
     companion object {
-        private open class LineChartManager(
-            private val lineChart: LineChart,
-            private val window: Int,
-            private val dataSets: Array<LineDataSet>
-        ) {
-
-            var offset: Int = 0
-
-            private val buffer: FloatArray = FloatArray(dataSets.size)
-
-            /** Updates the Chart.  */
-            open fun onUpdateChart(vertical: FloatArray) {
-                // Increment the Offset.
-                ++offset
-                // Buffer the Averages.
-                for (i in vertical.indices) {
-                    // Accumulate.
-                    buffer[i] += vertical[i]
-                }
-                // Check whether window length is reached.
-                if (offset % window == 0) {
-                    // Perform an aggregated update.
-                    onAggregateUpdate(buffer)
-                    // Clear the Buffer.
-                    Arrays.fill(buffer, 0.0f)
-                }
-            }
-
-            /** Called when the number of samples displayed on the graph have satisfied the window size.  */
-            open fun onAggregateUpdate(aggregate: FloatArray) {
-                // Update the chart.
-                for (i in dataSets.indices) {
-                    // Calculate the Average.
-                    val average = buffer[i] / window
-                    // Fetch the DataSet.
-                    val lineDataSet = dataSets[i]
-                    // Write this Value to the Aggregate for subclasses.
-                    aggregate[i] = average
-                    // Remove the oldest element.
-                    lineDataSet.removeFirst()
-                    // Buffer the Average.
-                    lineDataSet.addEntry(Entry(offset.toFloat(), average))
-                }
-                // Invalidate the Graph. (Ensure it is redrawn!)
-                lineChart.invalidate()
-            }
-        }
-
-        private enum class Mode {
-            /** Defines when the app is recording motion data.  */
-            TRAINING,
-            /** Defines when the app is attempting to recognize motion data.  */
-            RECOGNITION
-        }
-
         /** Empty Description. */
         private val DESCRIPTION_NULL: Description = object : Description() {
             init {
@@ -149,6 +96,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     private val recognitionHistory: List<MutableList<Float>> =
         listOf(mutableListOf(), mutableListOf(), mutableListOf())
 
+    private val trainingMap: MutableMap<String, List<MutableList<Float>>> = mutableMapOf()
+
     @SuppressLint("ClickableViewAccessibility")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -199,11 +148,9 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         color(training, intArrayOf(Color.RED, Color.GREEN, Color.BLUE))
         color(recognition, intArrayOf(Color.RED, Color.GREEN, Color.BLUE))
 
-        // Declare the LineChartManager.
         accelerationChartManager =
             LineChartManager(binding.lineChartAccelerometer, AVERAGE_WINDOW_LENGTH, acceleration)
 
-        // Declare the Training and Recognition update handling.
         trainChartManager = object :
             LineChartManager(binding.lineChartTrain, AVERAGE_WINDOW_LENGTH, training) {
             override fun onAggregateUpdate(aggregate: FloatArray) {
@@ -213,7 +160,6 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                 }
             }
         }
-        // Declare Recognition Handling.
         recognitionChartManager = object : LineChartManager(
             binding.lineChartRecognize,
             AVERAGE_WINDOW_LENGTH,
@@ -227,9 +173,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
             }
         }
-        // Listen for clicks on the Mode switch.
         binding.switchMode
-            .setOnCheckedChangeListener { _, isChecked -> // Update the training state.
+            .setOnCheckedChangeListener { _, isChecked ->
                 mode = if (isChecked) Mode.RECOGNITION else Mode.TRAINING
                 binding.textViewMode
                     .setText(if (isChecked) R.string.mode_recognition else R.string.mode_training)
@@ -237,106 +182,109 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                     .setText(if (isChecked) R.string.mode_recognition_desc else R.string.mode_training_desc)
             }
 
-        // Handle the ObscureLayout.
         binding.relativeLayoutObscure
             .setOnTouchListener { _, _ ->
                 binding.relativeLayoutObscure.visibility == View.VISIBLE
             }
 
-        // Listen for Touch Events on the FeedbackLayout.
         binding.frameLayoutFeedback
-            .setOnTouchListener { _, motionEvent -> // Handle the MotionEvent.
+            .setOnTouchListener { _, motionEvent ->
                 when (motionEvent.actionMasked) {
                     MotionEvent.ACTION_DOWN -> {
 
                         binding.switchMode.isEnabled = false
                         when (mode) {
                             Mode.TRAINING -> {
-                                // Reset the Training History.
                                 for (training in trainingHistory) {
                                     training.clear()
                                 }
-                                // Reset the Training Chart.
                                 trainChartManager.offset = 0
-                                // Re-initialize the Training Data.
                                 onInitializeData(
                                     training
                                 )
-                                // Assert that we're recording.
                                 onFeedbackRecording()
                             }
                             Mode.RECOGNITION -> {
-                                // Reset the Recognition History.
                                 for (recognition in recognitionHistory) {
                                     recognition.clear()
                                 }
-                                // Reset the Recognition Chart.
                                 recognitionChartManager.offset = 0
-                                // Re-initialize the Recognition Data.
                                 onInitializeData(
                                     recognition
                                 )
-                                // Assert that we're listening.
                                 onFeedbackRecognition()
                             }
                         }
-                        // Assert that we're now responsive.
                         isResponsive = true
                     }
                     MotionEvent.ACTION_UP -> {
 
-                        // We're no longer responsive.
                         isResponsive = false
-                        // Hide the FeedbackLayout.
                         onHideFeedback()
                         when (mode) {
-                            Mode.TRAINING -> {}
+                            Mode.TRAINING -> {
+                                StringInputDialogFragment().apply {
+                                    closeCallback = { text ->
+                                        trainingMap[text] = trainingHistory
+                                    }
+                                    show(
+                                        supportFragmentManager,
+                                        null
+                                    )
+                                }
+                            }
                             Mode.RECOGNITION -> {
                                 lifecycleScope.launch {
                                     binding.relativeLayoutObscure.isVisible = true
-                                    // Declare the Averages.
-                                    val averages = DoubleArray(3)
-                                    // Declare the Dynamic Time Warping Algorithm.
                                     val dtw = DTW()
-                                    for (i in averages.indices) {
-                                        // Fetch the Primitive Histories for this Axis.
-                                        val training = trainingHistory[i].toFloatArray()
-                                        val recognition = recognitionHistory[i].toFloatArray()
-                                        // Calculate the distance using Dynamic Time Warping.
-                                        averages[i] = dtw.compute(recognition, training).distance
+                                    var foundLetter = false
+                                    Log.d("MyTag", "${trainingMap.size}")
+                                    trainingMap.entries.forEach { entry ->
+                                        val averages = DoubleArray(3)
+                                        for (i in averages.indices) {
+                                            val training = entry.value[i].toFloatArray()
+                                            val recognition = recognitionHistory[i].toFloatArray()
+                                            averages[i] = dtw.compute(recognition, training).distance
+                                        }
+                                        binding.relativeLayoutObscure.isVisible = false
+
+                                        if(averages.filter { it < 0.02 }.size == 3) {
+                                            foundLetter = true
+                                            Toast.makeText(
+                                                this@MainActivity,
+                                                entry.key,
+                                                Toast.LENGTH_LONG
+                                            ).show()
+                                        }
                                     }
-                                    binding.relativeLayoutObscure.isVisible = false
-                                    Toast.makeText(
-                                        this@MainActivity,
-                                        "D(X:" + averages[0] + ", Y:" + averages[1] + ", Z:" + averages[2] + ")",
-                                        Toast.LENGTH_LONG
-                                    ).show()
+                                    if(!foundLetter) {
+                                        Toast.makeText(
+                                            this@MainActivity,
+                                            "Letter not found",
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                    }
                                 }
                             }
                         }
-                        // Re-enable the Switch.
                         binding.switchMode.isEnabled = true
                     }
                 }
                 true
             }
-        // Hide the Feedback Layout.
+
         this.onHideFeedback()
     }
 
     private fun onInitializeData(dataSet: Array<LineDataSet>) {
-        // Ensure the DataSets are empty.
         for (lineDataSet in dataSet) {
             lineDataSet.clear()
         }
-        // Initialize the Acceleration Charts.
         for (i in 0 until LENGTH_CHART_HISTORY) {
-            // Allocate a the default Entry.
             val entry = Entry(
                 i.toFloat(), 0.toFloat()
             )
             for (lineDataSet in dataSet) {
-                // Buffer the Entry.
                 lineDataSet.addEntry(entry)
             }
         }
@@ -367,17 +315,14 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
     override fun onSensorChanged(sensorEvent: SensorEvent) {
         if (sensorEvent.sensor.type == Sensor.TYPE_ACCELEROMETER) {
-            // Update the LineChartManager.
             accelerationChartManager.onUpdateChart(sensorEvent.values)
 
             if (isResponsive) {
                 when (mode) {
                     Mode.TRAINING -> {
-                        // Update the Training Chart.
                         trainChartManager.onUpdateChart(sensorEvent.values)
                     }
                     Mode.RECOGNITION -> {
-                        // Update the Recognition Chart.
                         recognitionChartManager.onUpdateChart(sensorEvent.values)
                     }
                 }
@@ -399,5 +344,14 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     override fun onPause() {
         super.onPause()
         sensorManager.unregisterListener(this)
+    }
+
+    private fun saveTrainingData() {
+
+    }
+
+    private fun showStringInputDialog() {
+        AlertDialog.Builder(this)
+            .setMessage("En")
     }
 }
