@@ -39,8 +39,9 @@ public class CustomThreadPool {
         public void run() {
             while (!(isThreadPoolShutDown.get())) {
                 Runnable runnableTask;
-                while ((runnableTask = runnableQueue.poll()) == null) {}
-                runnableTask.run();
+                while ((runnableTask = runnableQueue.poll()) != null) {
+                    runnableTask.run();
+                }
             }
         }
     }
